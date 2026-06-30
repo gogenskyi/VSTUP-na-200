@@ -151,12 +151,12 @@ def safe_float(value):
     except:
         return None
 
+    
 
+def extract_priority(value):
     if not value:
         return None
 
     match = re.search(r"\d+", value)
-    return
-def extract_priority(value):
- int(match.group()) if match else None
+    return int(match.group()) if match else None
 
