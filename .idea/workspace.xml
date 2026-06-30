@@ -4,10 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d9a2bce2-aea4-46db-893f-cd673ddd3112" name="Changes" comment="wip">
+    <list default="true" id="d9a2bce2-aea4-46db-893f-cd673ddd3112" name="Changes" comment="data parsing to file (beta)">
+      <change afterPath="$PROJECT_DIR$/database/repository.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/scraper/crawler/applicants.py" beforeDir="false" afterPath="$PROJECT_DIR$/scraper/crawler/applicants.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scraper/crawler/directions.py" beforeDir="false" afterPath="$PROJECT_DIR$/scraper/crawler/directions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scraper/crawler/universities.py" beforeDir="false" afterPath="$PROJECT_DIR$/scraper/crawler/universities.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -54,6 +57,7 @@
     "Python.directions.executor": "Run",
     "Python.http_client.executor": "Run",
     "Python.main.executor": "Run",
+    "Python.repository.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "git-widget-placeholder": "master",
     "settings.editor.selected.configurable": "com.intellij.pycharm.community.ide.impl.configuration.PythonContentEntriesConfigurable"
@@ -61,6 +65,7 @@
 }]]></component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/database" />
       <recent name="$PROJECT_DIR$/scraper" />
     </key>
   </component>
@@ -86,6 +91,7 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="initial" />
     <MESSAGE value="wip" />
-    <option name="LAST_COMMIT_MESSAGE" value="wip" />
+    <MESSAGE value="data parsing to file (beta)" />
+    <option name="LAST_COMMIT_MESSAGE" value="data parsing to file (beta)" />
   </component>
 </project>

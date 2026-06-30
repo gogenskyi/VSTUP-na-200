@@ -23,3 +23,9 @@ def get_universities(region_url):
             })
 
     return universities
+def insert_university(cur, region_id, name, url):
+    cur.execute(
+        "INSERT INTO universities (region_id, name, url) VALUES (?, ?, ?)",
+        (region_id, name, url)
+    )
+    return cur.lastrowid

@@ -1,47 +1,77 @@
-import csv
-import os
+import sqlite3
 
 from scraper.crawler.regions import get_regions
 from scraper.crawler.universities import get_universities
 from scraper.crawler.directions import get_directions
 from scraper.crawler.applicants import parse_direction
 
-os.makedirs("data", exist_ok=True)
+from database.repository import (
+    get_or_create_region,
+    insert_university,
+    insert_direction,
+    insert_applicants,
+    init_db
+)
 
-regions = get_regions()
 
-for region in regions:
+def main():
+    conn = sqlite3.connect("vstup.db", timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
 
-    universities = get_universities(region["url"])
+    cur = conn.cursor()
 
-    for university in universities:
+    init_db(conn)
 
-        directions = get_directions(university["url"])
+    regions = get_regions()
 
-        for direction in directions:
+    for region in regions:
+        try:
+            region_id = get_or_create_region(cur, region["name"])
 
-            applicants = parse_direction(direction["url"])
+            universities = get_universities(region["url"])
 
-            #print(direction["name"], len(applicants))
+            for university in universities:
+                uni_id = insert_university(
+                    cur,
+                    region_id,
+                    university["name"],
+                    university["url"]
+                )
 
-            if not applicants:
-                continue
+                directions = get_directions(university["url"])
 
-            # безпечна назва файлу
-            filename = (
-                direction["name"]
-                .replace("/", "_")
-                .replace("\\", "_")
-                .replace(":", "_")
-                .replace("|", "_")
-            )
+                for direction in directions:
 
-            filepath = os.path.join("data", f"{filename}.csv")
+                    # 1. завжди зберігаємо direction
+                    dir_id = insert_direction(
+                        cur,
+                        uni_id,
+                        direction["name"],
+                        direction["url"],
+                        "F"
+                    )
 
-            headers = list(applicants[0].keys())
+                    # 2. парсимо абітурієнтів
+                    applicants = parse_direction(direction["url"])
+                    #print(applicants[:2])
+                    # 3. вставляємо якщо є
+                    insert_applicants(cur, dir_id, applicants)
 
-            with open(filepath, "w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=headers)
+                    if applicants:
+                        print(
+                            f"{university['name']} | {direction['name']} -> {len(applicants)}"
+                        )
 
-                writer.writeheader()
-                writer.writerows(applicants)
+                # commit після кожного університету
+                conn.commit()
+
+        except Exception as e:
+            print("ERROR:", e)
+            conn.rollback()
+
+    conn.close()
+
+
+if __name__ == "__main__":
+    main()

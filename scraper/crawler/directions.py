@@ -23,3 +23,9 @@ def get_directions(univer_url):
             })
 
     return directions
+def insert_direction(cur, university_id, name, url, category):
+    cur.execute(
+        "INSERT INTO directions (university_id, name, url, category) VALUES (?, ?, ?, ?)",
+        (university_id, name, url, category)
+    )
+    return cur.lastrowid

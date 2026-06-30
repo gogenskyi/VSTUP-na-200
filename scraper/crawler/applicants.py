@@ -1,3 +1,4 @@
+import json
 from bs4 import BeautifulSoup
 from scraper.http_client import get_html
 
@@ -27,3 +28,18 @@ def parse_direction(direction_url):
             rows.append(dict(zip(headers, cols)))
 
     return rows
+def insert_applicants(cur, direction_id, applicants):
+    for a in applicants:
+        cur.execute("""
+            INSERT INTO applicants (
+                direction_id, rank, name, priority, score, status, raw_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            direction_id,
+            a.get("№"),
+            a.get("ПІБ"),
+            a.get("П"),
+            a.get("Заг.бал"),
+            a.get("Статус"),
+            json.dumps(a, ensure_ascii=False)
+        ))
