@@ -4,9 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d9a2bce2-aea4-46db-893f-cd673ddd3112" name="Changes" comment="working scraper database beta">
+    <list default="true" id="d9a2bce2-aea4-46db-893f-cd673ddd3112" name="Changes" comment="working scraper database beta*(previous not working)">
+      <change afterPath="$PROJECT_DIR$/data/specialities.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/database/repository.py" beforeDir="false" afterPath="$PROJECT_DIR$/database/repository.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scraper/crawler/directions.py" beforeDir="false" afterPath="$PROJECT_DIR$/scraper/crawler/directions.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -89,6 +91,7 @@
     <MESSAGE value="wip" />
     <MESSAGE value="data parsing to file (beta)" />
     <MESSAGE value="working scraper database beta" />
-    <option name="LAST_COMMIT_MESSAGE" value="working scraper database beta" />
+    <MESSAGE value="working scraper database beta*(previous not working)" />
+    <option name="LAST_COMMIT_MESSAGE" value="working scraper database beta*(previous not working)" />
   </component>
 </project>

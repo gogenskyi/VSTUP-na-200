@@ -1,8 +1,9 @@
 import sqlite3
 import re
-from typing import List, Dict, Any
+import json
 
-
+with open("data/specialities.json", encoding="utf-8") as f:
+    SPECIALITIES = json.load(f)
 # =========================
 # INIT DB
 # =========================
@@ -31,9 +32,14 @@ def init_db(conn: sqlite3.Connection):
     CREATE TABLE IF NOT EXISTS directions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         university_id INTEGER,
+
         name TEXT,
         url TEXT,
         form TEXT,
+
+        field_code TEXT,
+        field_name TEXT,
+
         UNIQUE(university_id, name)
     )
     """)
@@ -97,12 +103,15 @@ def insert_university(cur: sqlite3.Cursor, region_id: int, name: str, url: str) 
 # =========================
 
 def insert_direction(
-    cur: sqlite3.Cursor,
-    university_id: int,
-    name: str,
-    url: str,
-    form: str
-) -> int:
+    cur,
+    university_id,
+    name,
+    url,
+    form
+):
+    code = extract_speciality_code(name)
+
+    field_code, field_name = get_field_by_code(code)
 
     cur.execute("""
         SELECT id FROM directions
@@ -114,13 +123,35 @@ def insert_direction(
         return row[0]
 
     cur.execute("""
-        INSERT INTO directions (university_id, name, url, form)
-        VALUES (?, ?, ?, ?)
-    """, (university_id, name, url, form))
+        INSERT INTO directions (
+            university_id,
+            name,
+            url,
+            form,
+            field_code,
+            field_name
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        university_id,
+        name,
+        url,
+        form,
+        field_code,
+        field_name
+    ))
 
     return cur.lastrowid
 
+def extract_speciality_code(name: str):
+    match = re.search(r"\d{3}", name)
+    return match.group(0) if match else None
+def get_field_by_code(code: str):
+    spec = SPECIALITIES.get(code)
+    if not spec:
+        return None, None
 
+    return spec["field_code"], spec["field_name"]
 # =========================
 # APPLICANTS
 # =========================
