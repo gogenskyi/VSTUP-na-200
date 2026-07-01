@@ -137,31 +137,55 @@ def insert_university(cur: sqlite3.Cursor, region_id: int, name: str, url: str) 
 # =========================
 
 def get_speciality_info(direction_name: str):
-    name_norm = normalize(direction_name)
+    name = normalize(direction_name)
 
-    best_match = None
+    best_spec = None
     best_score = 0
 
-    for spec in SPECIALITIES_BY_NAME.values():
+    for spec in SPECIALITIES.values():
         spec_name = normalize(spec["name"])
 
-        # рахуємо простий overlap score
-        score = _match_score(name_norm, spec_name)
+        score = _score(name, spec_name)
 
         if score > best_score:
             best_score = score
-            best_match = spec
+            best_spec = spec
 
-    # поріг щоб не ловити сміття
-    if best_score < 0.35:
+    if best_score < 0.25:   # важливо: низький поріг, бо назви різні
         return None, None, None, None
 
     return (
-        best_match["old_code"],
-        best_match["name"],
-        best_match["field_code"],
-        best_match["field_name"]
+        best_spec["old_code"],
+        best_spec["name"],
+        best_spec["field_code"],
+        best_spec["field_name"]
     )
+
+def _score(text: str, spec: str) -> float:
+    text_tokens = set(text.split())
+    spec_tokens = set(spec.split())
+
+    if not spec_tokens:
+        return 0
+
+    # базовий overlap
+    overlap = len(text_tokens & spec_tokens)
+
+    # бонус за ключові інженерні слова
+    keywords = {
+        "електроніка",
+        "телекомунікації",
+        "приладобудування",
+        "радіотехніка",
+        "електронні",
+        "комунікації",
+        "інженерія",
+        "техніка"
+    }
+
+    bonus = len([w for w in text_tokens if w in keywords]) * 0.2
+
+    return overlap / len(spec_tokens) + bonus
 
 def _match_score(text: str, spec: str) -> float:
     text_tokens = set(text.split())
