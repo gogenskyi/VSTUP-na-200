@@ -1,9 +1,39 @@
 import sqlite3
 import re
 import json
+from pathlib import Path
 
-with open("data/specialities.json", encoding="utf-8") as f:
+# =========================
+# PATHS + LOAD DATA
+# =========================
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+SPECIALITIES_FILE = BASE_DIR / "data" / "specialities.json"
+
+with open(SPECIALITIES_FILE, encoding="utf-8") as f:
     SPECIALITIES = json.load(f)
+
+
+# =========================
+# NORMALIZATION
+# =========================
+
+def normalize(text: str) -> str:
+    return (
+        text.lower()
+        .replace("’", "'")
+        .replace("ʼ", "'")
+        .replace("`", "'")
+        .strip()
+    )
+
+
+SPECIALITIES_BY_NAME = {
+    normalize(v["name"]): v
+    for v in SPECIALITIES.values()
+}
+
+
 # =========================
 # INIT DB
 # =========================
@@ -31,11 +61,15 @@ def init_db(conn: sqlite3.Connection):
     cur.execute("""
     CREATE TABLE IF NOT EXISTS directions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+
         university_id INTEGER,
 
         name TEXT,
         url TEXT,
         form TEXT,
+
+        speciality_code TEXT,
+        speciality_name TEXT,
 
         field_code TEXT,
         field_name TEXT,
@@ -99,6 +133,48 @@ def insert_university(cur: sqlite3.Cursor, region_id: int, name: str, url: str) 
 
 
 # =========================
+# SPECIALITY MATCHING
+# =========================
+
+def get_speciality_info(direction_name: str):
+    name_norm = normalize(direction_name)
+
+    best_match = None
+    best_score = 0
+
+    for spec in SPECIALITIES_BY_NAME.values():
+        spec_name = normalize(spec["name"])
+
+        # рахуємо простий overlap score
+        score = _match_score(name_norm, spec_name)
+
+        if score > best_score:
+            best_score = score
+            best_match = spec
+
+    # поріг щоб не ловити сміття
+    if best_score < 0.35:
+        return None, None, None, None
+
+    return (
+        best_match["old_code"],
+        best_match["name"],
+        best_match["field_code"],
+        best_match["field_name"]
+    )
+
+def _match_score(text: str, spec: str) -> float:
+    text_tokens = set(text.split())
+    spec_tokens = set(spec.split())
+
+    if not spec_tokens:
+        return 0
+
+    intersection = text_tokens.intersection(spec_tokens)
+
+    return len(intersection) / len(spec_tokens)
+
+# =========================
 # DIRECTIONS
 # =========================
 
@@ -109,9 +185,10 @@ def insert_direction(
     url,
     form
 ):
-    code = extract_speciality_code(name)
+    speciality_code, speciality_name, field_code, field_name = get_speciality_info(name)
 
-    field_code, field_name = get_field_by_code(code)
+    if field_code is None:
+        print("NOT MATCHED SPECIALITY:", name)
 
     cur.execute("""
         SELECT id FROM directions
@@ -128,30 +205,60 @@ def insert_direction(
             name,
             url,
             form,
+            speciality_code,
+            speciality_name,
             field_code,
             field_name
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         university_id,
         name,
         url,
         form,
+        speciality_code,
+        speciality_name,
         field_code,
         field_name
     ))
 
     return cur.lastrowid
 
-def extract_speciality_code(name: str):
-    match = re.search(r"\d{3}", name)
-    return match.group(0) if match else None
-def get_field_by_code(code: str):
-    spec = SPECIALITIES.get(code)
-    if not spec:
-        return None, None
 
-    return spec["field_code"], spec["field_name"]
+# =========================
+# APPLICANTS HELPERS
+# =========================
+
+def safe_float(value):
+    try:
+        return float(value)
+    except:
+        return None
+
+
+def extract_priority(value):
+    if not value:
+        return None
+
+    value = str(value).strip()
+
+    # 1) стандартний формат "Пр. 3 (К)"
+    match = re.search(r"Пр\.\s*(\d+)", value)
+    if match:
+        return int(match.group(1))
+
+    # 2) просто число всередині рядка
+    match = re.search(r"\d+", value)
+    if match:
+        return int(match.group())
+
+    # 3) якщо є тільки "К", "Б" і т.д. — даємо дефолт
+    if value in {"К", "Б"}:
+        return 1
+
+    return None
+
+
 # =========================
 # APPLICANTS
 # =========================
@@ -176,18 +283,3 @@ def insert_applicants(cur, direction_id, applicants):
         )
         for a in applicants
     ])
-def safe_float(value):
-    try:
-        return float(value)
-    except:
-        return None
-
-    
-
-def extract_priority(value):
-    if not value:
-        return None
-
-    match = re.search(r"\d+", value)
-    return int(match.group()) if match else None
-
