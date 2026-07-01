@@ -4,9 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d9a2bce2-aea4-46db-893f-cd673ddd3112" name="Changes" comment="almost working database">
+    <list default="true" id="d9a2bce2-aea4-46db-893f-cd673ddd3112" name="Changes" comment="working database">
+      <change afterPath="$PROJECT_DIR$/scraper/utils/specialities.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/database/repository.py" beforeDir="false" afterPath="$PROJECT_DIR$/database/repository.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scraper/crawler/applicants.py" beforeDir="false" afterPath="$PROJECT_DIR$/scraper/crawler/applicants.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scraper/crawler/directions.py" beforeDir="false" afterPath="$PROJECT_DIR$/scraper/crawler/directions.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -92,6 +96,7 @@
     <MESSAGE value="working scraper database beta*(previous not working)" />
     <MESSAGE value="fix directions in db&#10;not working field code parser" />
     <MESSAGE value="almost working database" />
-    <option name="LAST_COMMIT_MESSAGE" value="almost working database" />
+    <MESSAGE value="working database" />
+    <option name="LAST_COMMIT_MESSAGE" value="working database" />
   </component>
 </project>

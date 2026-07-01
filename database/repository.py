@@ -2,7 +2,7 @@ import sqlite3
 import re
 import json
 from pathlib import Path
-
+from scraper.utils.specialities import extract_speciality_info
 # =========================
 # PATHS + LOAD DATA
 # =========================
@@ -81,13 +81,19 @@ def init_db(conn: sqlite3.Connection):
     cur.execute("""
     CREATE TABLE IF NOT EXISTS applicants (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+
         direction_id INTEGER,
+        field_code TEXT,   -- NEW
+
         rank INTEGER,
         name TEXT,
         priority INTEGER,
         score REAL,
         status TEXT,
+        quota INTEGER,
+
         raw_json TEXT,
+
         UNIQUE(direction_id, name, priority)
     )
     """)
@@ -151,7 +157,7 @@ def get_speciality_info(direction_name: str):
             best_score = score
             best_spec = spec
 
-    if best_score < 0.25:   # важливо: низький поріг, бо назви різні
+    if not best_spec or best_score < 0.25:
         return None, None, None, None
 
     return (
@@ -161,6 +167,7 @@ def get_speciality_info(direction_name: str):
         best_spec["field_name"]
     )
 
+
 def _score(text: str, spec: str) -> float:
     text_tokens = set(text.split())
     spec_tokens = set(spec.split())
@@ -168,51 +175,30 @@ def _score(text: str, spec: str) -> float:
     if not spec_tokens:
         return 0
 
-    # базовий overlap
     overlap = len(text_tokens & spec_tokens)
 
-    # бонус за ключові інженерні слова
     keywords = {
         "електроніка",
         "телекомунікації",
         "приладобудування",
         "радіотехніка",
-        "електронні",
-        "комунікації",
         "інженерія",
-        "техніка"
+        "техніка",
+        "комп'ютер",
+        "комп’ютер"
     }
 
     bonus = len([w for w in text_tokens if w in keywords]) * 0.2
 
     return overlap / len(spec_tokens) + bonus
 
-def _match_score(text: str, spec: str) -> float:
-    text_tokens = set(text.split())
-    spec_tokens = set(spec.split())
-
-    if not spec_tokens:
-        return 0
-
-    intersection = text_tokens.intersection(spec_tokens)
-
-    return len(intersection) / len(spec_tokens)
 
 # =========================
 # DIRECTIONS
 # =========================
 
-def insert_direction(
-    cur,
-    university_id,
-    name,
-    url,
-    form
-):
-    speciality_code, speciality_name, field_code, field_name = get_speciality_info(name)
-
-    if field_code is None:
-        print("NOT MATCHED SPECIALITY:", name)
+def insert_direction(cur, university_id, name, url, form):
+    speciality_code, speciality_name, field_code, field_name = extract_speciality_info(name)
 
     cur.execute("""
         SELECT id FROM directions
@@ -221,7 +207,7 @@ def insert_direction(
 
     row = cur.fetchone()
     if row:
-        return row[0]
+        return row[0], field_code
 
     cur.execute("""
         INSERT INTO directions (
@@ -246,7 +232,7 @@ def insert_direction(
         field_name
     ))
 
-    return cur.lastrowid
+    return cur.lastrowid, field_code
 
 
 # =========================
@@ -266,44 +252,73 @@ def extract_priority(value):
 
     value = str(value).strip()
 
-    # 1) стандартний формат "Пр. 3 (К)"
     match = re.search(r"Пр\.\s*(\d+)", value)
     if match:
         return int(match.group(1))
 
-    # 2) просто число всередині рядка
     match = re.search(r"\d+", value)
     if match:
         return int(match.group())
 
-    # 3) якщо є тільки "К", "Б" і т.д. — даємо дефолт
     if value in {"К", "Б"}:
         return 1
 
     return None
 
 
+def extract_quota(row: dict):
+    quota = str(row.get("Квота", "")).strip().lower()
+
+    if "квота-1" in quota:
+        return 1
+
+    if "квота-2" in quota:
+        return 2
+
+    return 0
+
+
 # =========================
 # APPLICANTS
 # =========================
 
-def insert_applicants(cur, direction_id, applicants):
+def insert_applicants(cur, direction_id, field_code, applicants):
     if not applicants:
         return
 
-    cur.executemany("""
-        INSERT OR IGNORE INTO applicants
-        (direction_id, rank, name, priority, score, status, raw_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, [
-        (
+    for a in applicants:
+
+        quota = extract_quota(a)
+
+        cur.execute("""
+            INSERT INTO applicants (
+                direction_id,
+                field_code,
+                rank,
+                name,
+                priority,
+                score,
+                status,
+                quota,
+                raw_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(direction_id, name, priority)
+            DO UPDATE SET
+                rank = excluded.rank,
+                score = excluded.score,
+                status = excluded.status,
+                quota = excluded.quota,
+                raw_json = excluded.raw_json,
+                field_code = excluded.field_code
+        """, (
             direction_id,
-            int(a.get("№")) if a.get("№") else None,
+            field_code,
+            a.get("№"),
             a.get("ПІБ"),
             extract_priority(a.get("П")),
             safe_float(a.get("Заг.бал")),
             a.get("Статус"),
-            str(a)
-        )
-        for a in applicants
-    ])
+            quota,
+            json.dumps(a, ensure_ascii=False)
+        ))

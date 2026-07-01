@@ -44,7 +44,7 @@ def main():
                 for direction in directions:
 
                     # 1. завжди зберігаємо direction
-                    dir_id = insert_direction(
+                    dir_id, field_code = insert_direction(
                         cur,
                         uni_id,
                         direction["name"],
@@ -52,12 +52,9 @@ def main():
                         "F"
                     )
 
-                    # 2. парсимо абітурієнтів
                     applicants = parse_direction(direction["url"])
-                    #print(applicants[:2])
-                    # 3. вставляємо якщо є
-                    insert_applicants(cur, dir_id, applicants)
 
+                    insert_applicants(cur, dir_id, field_code, applicants)
                     if applicants:
                         print(
                             f"{university['name']} | {direction['name']} -> {len(applicants)}"
