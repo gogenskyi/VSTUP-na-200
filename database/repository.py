@@ -1,6 +1,5 @@
-import sqlite3
-import re
 import json
+import sqlite3
 from pathlib import Path
 from scraper.utils.specialities import extract_speciality_info
 # =========================
@@ -28,12 +27,6 @@ def normalize(text: str) -> str:
     )
 
 
-SPECIALITIES_BY_NAME = {
-    normalize(v["name"]): v
-    for v in SPECIALITIES.values()
-}
-
-
 # =========================
 # INIT DB
 # =========================
@@ -44,16 +37,21 @@ def init_db(conn: sqlite3.Connection):
     cur.execute("""
     CREATE TABLE IF NOT EXISTS regions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT UNIQUE
+        name TEXT NOT NULL UNIQUE
     )
     """)
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS universities (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        region_id INTEGER,
-        name TEXT,
+
+        region_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
         url TEXT,
+
+        FOREIGN KEY(region_id)
+            REFERENCES regions(id),
+
         UNIQUE(region_id, name)
     )
     """)
@@ -62,9 +60,9 @@ def init_db(conn: sqlite3.Connection):
     CREATE TABLE IF NOT EXISTS directions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-        university_id INTEGER,
+        university_id INTEGER NOT NULL,
 
-        name TEXT,
+        name TEXT NOT NULL,
         url TEXT,
         form TEXT,
 
@@ -74,6 +72,9 @@ def init_db(conn: sqlite3.Connection):
         field_code TEXT,
         field_name TEXT,
 
+        FOREIGN KEY(university_id)
+            REFERENCES universities(id),
+
         UNIQUE(university_id, name)
     )
     """)
@@ -82,24 +83,57 @@ def init_db(conn: sqlite3.Connection):
     CREATE TABLE IF NOT EXISTS applicants (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-        direction_id INTEGER,
-        field_code TEXT,   -- NEW
+        person_key TEXT NOT NULL UNIQUE,
 
-        rank INTEGER,
-        name TEXT,
-        priority INTEGER,
-        score REAL,
-        status TEXT,
-        quota INTEGER,
+        full_name TEXT NOT NULL,
 
-        raw_json TEXT,
+        quota INTEGER DEFAULT 0,
 
-        UNIQUE(direction_id, name, priority)
+        raw_json TEXT
     )
     """)
 
-    conn.commit()
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS applications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
 
+        applicant_id INTEGER NOT NULL,
+        direction_id INTEGER NOT NULL,
+
+        rank INTEGER,
+        priority INTEGER,
+
+        score REAL,
+
+        status TEXT,
+        quota INTEGER DEFAULT 0,
+
+        FOREIGN KEY(applicant_id)
+            REFERENCES applicants(id),
+
+        FOREIGN KEY(direction_id)
+            REFERENCES directions(id),
+
+        UNIQUE(applicant_id, direction_id)
+    )
+    """)
+
+    cur.execute("""
+    CREATE INDEX IF NOT EXISTS idx_applications_direction
+    ON applications(direction_id)
+    """)
+
+    cur.execute("""
+    CREATE INDEX IF NOT EXISTS idx_applications_applicant
+    ON applications(applicant_id)
+    """)
+
+    cur.execute("""
+    CREATE INDEX IF NOT EXISTS idx_directions_speciality
+    ON directions(speciality_code)
+    """)
+
+    conn.commit()
 
 # =========================
 # REGIONS
@@ -198,16 +232,20 @@ def _score(text: str, spec: str) -> float:
 # =========================
 
 def insert_direction(cur, university_id, name, url, form):
-    speciality_code, speciality_name, field_code, field_name = extract_speciality_info(name)
+    speciality_code, speciality_name, field_code, field_name = (
+        extract_speciality_info(name)
+    )
 
     cur.execute("""
-        SELECT id FROM directions
+        SELECT id
+        FROM directions
         WHERE university_id = ? AND name = ?
     """, (university_id, name))
 
     row = cur.fetchone()
+
     if row:
-        return row[0], field_code
+        return row[0]
 
     cur.execute("""
         INSERT INTO directions (
@@ -231,94 +269,4 @@ def insert_direction(cur, university_id, name, url, form):
         field_code,
         field_name
     ))
-
-    return cur.lastrowid, field_code
-
-
-# =========================
-# APPLICANTS HELPERS
-# =========================
-
-def safe_float(value):
-    try:
-        return float(value)
-    except:
-        return None
-
-
-def extract_priority(value):
-    if not value:
-        return None
-
-    value = str(value).strip()
-
-    match = re.search(r"Пр\.\s*(\d+)", value)
-    if match:
-        return int(match.group(1))
-
-    match = re.search(r"\d+", value)
-    if match:
-        return int(match.group())
-
-    if value in {"К", "Б"}:
-        return 1
-
-    return None
-
-
-def extract_quota(row: dict):
-    quota = str(row.get("Квота", "")).strip().lower()
-
-    if "квота-1" in quota:
-        return 1
-
-    if "квота-2" in quota:
-        return 2
-
-    return 0
-
-
-# =========================
-# APPLICANTS
-# =========================
-
-def insert_applicants(cur, direction_id, field_code, applicants):
-    if not applicants:
-        return
-
-    for a in applicants:
-
-        quota = extract_quota(a)
-
-        cur.execute("""
-            INSERT INTO applicants (
-                direction_id,
-                field_code,
-                rank,
-                name,
-                priority,
-                score,
-                status,
-                quota,
-                raw_json
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(direction_id, name, priority)
-            DO UPDATE SET
-                rank = excluded.rank,
-                score = excluded.score,
-                status = excluded.status,
-                quota = excluded.quota,
-                raw_json = excluded.raw_json,
-                field_code = excluded.field_code
-        """, (
-            direction_id,
-            field_code,
-            a.get("№"),
-            a.get("ПІБ"),
-            extract_priority(a.get("П")),
-            safe_float(a.get("Заг.бал")),
-            a.get("Статус"),
-            quota,
-            json.dumps(a, ensure_ascii=False)
-        ))
+    return cur.lastrowid

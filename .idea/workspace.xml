@@ -5,12 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d9a2bce2-aea4-46db-893f-cd673ddd3112" name="Changes" comment="working database">
-      <change afterPath="$PROJECT_DIR$/scraper/utils/specialities.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scraper/crawler/applications.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/database/repository.py" beforeDir="false" afterPath="$PROJECT_DIR$/database/repository.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/scraper/crawler/applicants.py" beforeDir="false" afterPath="$PROJECT_DIR$/scraper/crawler/applicants.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scraper/crawler/directions.py" beforeDir="false" afterPath="$PROJECT_DIR$/scraper/crawler/directions.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -27,24 +26,24 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "gogenskyi"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;gogenskyi&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/gogenskyi/VSTUP-na-200",
-    "accountId": "c69c9f6e-ac02-4abf-a997-6426f6fa20f0"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/gogenskyi/VSTUP-na-200&quot;,
+    &quot;accountId&quot;: &quot;c69c9f6e-ac02-4abf-a997-6426f6fa20f0&quot;
   }
-}]]></component>
+}</component>
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$PROJECT_DIR$/main.py" root0="FORCE_HIGHLIGHTING" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 6
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 6
+}</component>
   <component name="ProjectId" id="3Fnmenx9qSSXE00rUJ8glHQdijO" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
@@ -54,13 +53,16 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "Python.applicants.executor": "Run",
+    "Python.applications.executor": "Run",
     "Python.directions.executor": "Run",
     "Python.http_client.executor": "Run",
     "Python.main.executor": "Run",
     "Python.repository.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
     "git-widget-placeholder": "master",
-    "settings.editor.selected.configurable": "com.intellij.pycharm.community.ide.impl.configuration.PythonContentEntriesConfigurable"
+    "last_opened_file_path": "/home/gogenskyi/PycharmProjects/Vstup-na-200",
+    "settings.editor.selected.configurable": "preferences.pluginManager"
   }
 }]]></component>
   <component name="RecentsManager">
@@ -77,6 +79,16 @@
     </attachedChunks>
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="d9a2bce2-aea4-46db-893f-cd673ddd3112" name="Changes" comment="working database" />
+      <created>1783157316819</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1783157316819</updated>
+    </task>
+    <servers />
+  </component>
   <component name="Vcs.Log.Tabs.Properties">
     <option name="TAB_STATES">
       <map>

@@ -6,18 +6,21 @@ from scraper.crawler.directions import get_directions
 from scraper.crawler.applicants import parse_direction
 
 from database.repository import (
+    init_db,
     get_or_create_region,
     insert_university,
-    insert_direction,
-    insert_applicants,
-    init_db
+    insert_direction
 )
+
+from scraper.crawler.applications import insert_applications
 
 
 def main():
     conn = sqlite3.connect("vstup.db", timeout=30)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous=NORMAL")
+
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
 
     cur = conn.cursor()
 
@@ -27,11 +30,17 @@ def main():
 
     for region in regions:
         try:
-            region_id = get_or_create_region(cur, region["name"])
+            region_id = get_or_create_region(
+                cur,
+                region["name"]
+            )
 
-            universities = get_universities(region["url"])
+            universities = get_universities(
+                region["url"]
+            )
 
             for university in universities:
+
                 uni_id = insert_university(
                     cur,
                     region_id,
@@ -39,12 +48,13 @@ def main():
                     university["url"]
                 )
 
-                directions = get_directions(university["url"])
+                directions = get_directions(
+                    university["url"]
+                )
 
                 for direction in directions:
 
-                    # 1. завжди зберігаємо direction
-                    dir_id, field_code = insert_direction(
+                    direction_id = insert_direction(
                         cur,
                         uni_id,
                         direction["name"],
@@ -52,15 +62,24 @@ def main():
                         "F"
                     )
 
-                    applicants = parse_direction(direction["url"])
+                    applicants = parse_direction(
+                        direction["url"]
+                    )
 
-                    insert_applicants(cur, dir_id, field_code, applicants)
+                    insert_applications(
+                        cur,
+                        direction_id,
+                        applicants
+                    )
+
                     if applicants:
+                        #print(applicants[0])
                         print(
-                            f"{university['name']} | {direction['name']} -> {len(applicants)}"
+                           f"{university['name']} | "
+                           f"{direction['name']} -> "
+                           f"{len(applicants)} applicants"
                         )
 
-                # commit після кожного університету
                 conn.commit()
 
         except Exception as e:

@@ -2,101 +2,115 @@ import json
 import re
 from bs4 import BeautifulSoup
 from scraper.http_client import get_html
-
+# ========================= # PARSE # =========================
 
 def parse_direction(direction_url):
     html = get_html(direction_url)
     soup = BeautifulSoup(html, "html.parser")
-
     table = soup.find("table")
     if not table:
         return []
-
     headers = [th.get_text(strip=True) for th in table.find_all("th")]
-
     rows = []
-
     for tr in table.find_all("tr")[1:]:
         cols = [td.get_text(" ", strip=True) for td in tr.find_all("td")]
-
-        if len(cols) == len(headers):
-            rows.append(dict(zip(headers, cols)))
-
+        if len(cols) == len(headers): rows.append(dict(zip(headers, cols)))
     return rows
 
-
-# -------------------------
-# HELPERS
-# -------------------------
-
-def extract_priority(value):
+def extract_applicant_name(value):
     if not value:
-        return None
+        return ""
 
-    value = str(value)
+    value = str(value).strip()
 
-    m = re.search(r"Пр\.\s*(\d+)", value)
-    if m:
-        return int(m.group(1))
+    # номер рейтингу
+    value = re.sub(r"^\d+\s+", "", value)
 
-    m = re.search(r"\d+", value)
-    if m:
-        return int(m.group())
+    # код абітурієнта
+    value = re.sub(r"^\d{2}-\d+\s*", "", value)
 
-    return None
+    # пріоритет
+    value = re.sub(r"\s+Пр\.\s*\d+.*$", "", value)
 
+    return value.strip()
+
+def build_person_key(row):
+    raw_name = row.get("ПІБ", "")
+
+    code = extract_applicant_code(raw_name)
+
+    if code:
+        return f"code:{code}"
+
+    return f"name:{extract_applicant_name(raw_name)}"
+
+def extract_applicant_code(value):
+    m = re.search(r"(\d{2}-\d+)", value or "")
+    return m.group(1) if m else None
 
 def extract_quota(row):
-    q = str(row.get("Квота", "")).lower()
+    quota = str(row.get("Квота", "")).lower()
 
-    if "квота-1" in q:
+    if "квота-1" in quota:
         return 1
-    if "квота-2" in q:
+
+    if "квота-2" in quota:
         return 2
 
     return 0
 
+def build_person_key(row):
+    raw_name = row.get("ПІБ", "")
 
-def safe_float(v):
-    try:
-        return float(v)
-    except:
-        return None
+    code = extract_applicant_code(raw_name)
 
+    if code:
+        return f"code:{code}"
 
-# -------------------------
-# INSERT
-# -------------------------
+    name = extract_applicant_name(raw_name)
 
-def insert_applicants(cur, direction_code, applicants):
-    for a in applicants:
+    subjects = row.get("Складові заг. балу", "")
 
-        cur.execute("""
-            INSERT INTO applicants (
-                direction_code,
-                rank,
-                name,
-                priority,
-                score,
-                status,
-                quota,
-                raw_json
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(direction_code, name, priority)
-            DO UPDATE SET
-                rank=excluded.rank,
-                score=excluded.score,
-                status=excluded.status,
-                quota=excluded.quota,
-                raw_json=excluded.raw_json
-        """, (
-            direction_code,
-            a.get("№"),
-            a.get("ПІБ"),
-            extract_priority(a.get("П")),
-            safe_float(a.get("Заг.бал")),
-            a.get("Статус"),
-            extract_quota(a),
-            json.dumps(a, ensure_ascii=False)
-        ))
+    numbers = re.findall(r"\b\d{3}\b", subjects)
+
+    if numbers:
+        return f"name:{name}|{'-'.join(numbers[:4])}"
+
+    return f"name:{name}"
+
+def get_or_create_applicant(cur, row):
+    person_key = build_person_key(row)
+
+    full_name = extract_applicant_name(
+        row.get("ПІБ")
+    )
+
+    quota = extract_quota(row)
+
+    cur.execute("""
+        INSERT INTO applicants (
+            person_key,
+            full_name,
+            quota,
+            raw_json
+        )
+        VALUES (?, ?, ?, ?)
+
+        ON CONFLICT(person_key)
+        DO UPDATE SET
+            quota = excluded.quota,
+            raw_json = excluded.raw_json
+    """, (
+        person_key,
+        full_name,
+        quota,
+        json.dumps(row, ensure_ascii=False)
+    ))
+
+    cur.execute("""
+        SELECT id
+        FROM applicants
+        WHERE person_key = ?
+    """, (person_key,))
+
+    return cur.fetchone()[0]
