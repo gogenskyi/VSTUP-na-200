@@ -80,13 +80,10 @@ def build_person_key(row):
 
 def get_or_create_applicant(cur, row):
     person_key = build_person_key(row)
-
-    full_name = extract_applicant_name(
-        row.get("ПІБ")
-    )
-
+    full_name = extract_applicant_name(row.get("ПІБ"))
     quota = extract_quota(row)
 
+    # Використовуємо RETURNING id для безпечного повернення ідентифікатора
     cur.execute("""
         INSERT INTO applicants (
             person_key,
@@ -95,11 +92,11 @@ def get_or_create_applicant(cur, row):
             raw_json
         )
         VALUES (?, ?, ?, ?)
-
         ON CONFLICT(person_key)
         DO UPDATE SET
             quota = excluded.quota,
             raw_json = excluded.raw_json
+        RETURNING id;
     """, (
         person_key,
         full_name,
@@ -107,10 +104,10 @@ def get_or_create_applicant(cur, row):
         json.dumps(row, ensure_ascii=False)
     ))
 
-    cur.execute("""
-        SELECT id
-        FROM applicants
-        WHERE person_key = ?
-    """, (person_key,))
-
-    return cur.fetchone()[0]
+    # Отримуємо ID безпосередньо з результату виконання запиту
+    result = cur.fetchone()
+    if result:
+        return result[0]
+    else:
+        # У разі непередбачуваної помилки варто кидати виключення, щоб зупинити парсер
+        raise ValueError(f"Не вдалося отримати або створити ID для {person_key}")
