@@ -59,13 +59,16 @@ def main():
                 )
 
                 for direction in directions:
-
                     direction_id = insert_direction(
                         cur,
                         uni_id,
                         direction["name"],
                         direction["url"],
-                        "F"
+                        "денна",
+                        direction["budget_places"],
+                        direction["max_places"],
+                        direction["contract_places"],
+                        direction["applications_count"]
                     )
 
                     applicants = parse_direction(
@@ -78,13 +81,15 @@ def main():
                         applicants
                     )
 
-                    if applicants:
-                        #print(applicants[0])
-                        print(
-                           f"{university['name']} | "
-                           f"{direction['name']} -> "
-                           f"{len(applicants)} applicants"
-                        )
+                    print(
+                        f"{university['name']} | "
+                        f"{direction['name']} | "
+                        f"БМ={direction['budget_places']} "
+                        f"ВМ={direction['max_places']} "
+                        f"Контракт={direction['contract_places']} "
+                        f"Заяв={direction['applications_count']} | "
+                        f"{len(applicants)} applicants"
+                    )
 
                 conn.commit()
 

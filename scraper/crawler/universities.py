@@ -4,28 +4,38 @@ from scraper.http_client import get_html
 BASE_URL = "https://abit-poisk.org.ua"
 
 
-def get_universities(region_url):
+def get_universities(region_url: str) -> list[dict]:
     html = get_html(region_url)
+
+    if not html:
+        return []
 
     soup = BeautifulSoup(html, "html.parser")
 
     universities = []
+    seen = set()
 
     for a in soup.find_all("a", href=True):
+        href = a.get("href", "")
 
-        href = a["href"]
+        if "/rate2025/univer/" not in href:
+            continue
 
-        if "/rate2025/univer/" in href:
+        name = a.get_text(" ", strip=True)
 
-            universities.append({
-                "name": a.get_text(strip=True),
-                "url": BASE_URL + href
-            })
+        if not name:
+            continue
+
+        full_url = BASE_URL + href
+
+        if full_url in seen:
+            continue
+
+        seen.add(full_url)
+
+        universities.append({
+            "name": name,
+            "url": full_url
+        })
 
     return universities
-def insert_university(cur, region_id, name, url):
-    cur.execute(
-        "INSERT INTO universities (region_id, name, url) VALUES (?, ?, ?)",
-        (region_id, name, url)
-    )
-    return cur.lastrowid

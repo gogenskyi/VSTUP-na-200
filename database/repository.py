@@ -58,24 +58,29 @@ def init_db(conn: sqlite3.Connection):
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS directions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-        university_id INTEGER NOT NULL,
+    university_id INTEGER NOT NULL,
 
-        name TEXT NOT NULL,
-        url TEXT,
-        form TEXT,
+    name TEXT NOT NULL,
+    url TEXT,
+    form TEXT,
 
-        speciality_code TEXT,
-        speciality_name TEXT,
+    speciality_code TEXT,
+    speciality_name TEXT,
 
-        field_code TEXT,
-        field_name TEXT,
+    field_code TEXT,
+    field_name TEXT,
 
-        FOREIGN KEY(university_id)
-            REFERENCES universities(id),
+    budget_places INTEGER DEFAULT 0,
+    max_places INTEGER DEFAULT 0,
+    contract_places INTEGER DEFAULT 0,
+    applications_count INTEGER DEFAULT 0,
 
-        UNIQUE(university_id, name)
+    FOREIGN KEY(university_id)
+        REFERENCES universities(id),
+
+    UNIQUE(university_id, name)
     )
     """)
 
@@ -154,18 +159,24 @@ def get_or_create_region(cur: sqlite3.Cursor, name: str) -> int:
 # UNIVERSITIES
 # =========================
 
-def insert_university(cur: sqlite3.Cursor, region_id: int, name: str, url: str) -> int:
+def insert_university(cur, region_id, name, url):
     cur.execute("""
-        SELECT id FROM universities
+        SELECT id
+        FROM universities
         WHERE region_id = ? AND name = ?
     """, (region_id, name))
 
     row = cur.fetchone()
+
     if row:
         return row[0]
 
     cur.execute("""
-        INSERT INTO universities (region_id, name, url)
+        INSERT INTO universities (
+            region_id,
+            name,
+            url
+        )
         VALUES (?, ?, ?)
     """, (region_id, name, url))
 
@@ -231,7 +242,17 @@ def _score(text: str, spec: str) -> float:
 # DIRECTIONS
 # =========================
 
-def insert_direction(cur, university_id, name, url, form):
+def insert_direction(
+    cur,
+    university_id,
+    name,
+    url,
+    form,
+    budget_places=0,
+    max_places=0,
+    contract_places=0,
+    applications_count=0
+):
     speciality_code, speciality_name, field_code, field_name = (
         extract_speciality_info(name)
     )
@@ -256,9 +277,13 @@ def insert_direction(cur, university_id, name, url, form):
             speciality_code,
             speciality_name,
             field_code,
-            field_name
+            field_name,
+            budget_places,
+            max_places,
+            contract_places,
+            applications_count
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         university_id,
         name,
@@ -267,6 +292,11 @@ def insert_direction(cur, university_id, name, url, form):
         speciality_code,
         speciality_name,
         field_code,
-        field_name
+        field_name,
+        budget_places,
+        max_places,
+        contract_places,
+        applications_count
     ))
+
     return cur.lastrowid
