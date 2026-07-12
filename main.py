@@ -41,6 +41,12 @@ def main():
 
             for university in universities:
 
+                name = university["name"].lower()
+
+                if "коледж" in name or "ліцей" in name:
+                    print(f"SKIP: {university['name']}")
+                    continue
+
                 uni_id = insert_university(
                     cur,
                     region_id,
