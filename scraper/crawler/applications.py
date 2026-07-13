@@ -12,12 +12,12 @@ def safe_float(value):
 
 def extract_priority(value):
     if value is None:
-        return None
+        return "к"
 
     value = str(value).strip()
 
     if value in {"", "-", "—"}:
-        return None
+        return "к"
 
     match = re.search(r"Пр\.\s*(\d+)", value)
     if match:
@@ -27,7 +27,7 @@ def extract_priority(value):
     if match:
         return int(match.group())
 
-    return None
+    return "к"
 
 def extract_quota(row):
     quota = str(row.get("Квота", "")).lower()
