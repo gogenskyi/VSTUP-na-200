@@ -41,6 +41,18 @@ def get_directions(univer_url: str) -> list[dict]:
         if len(cells) < 6:
             continue
 
+        # Нормалізуємо ОКР
+        okr = (
+            cells[0]
+            .get_text(" ", strip=True)
+            .upper()
+            .replace(" ", "")
+        )
+
+        # Залишаємо тільки бакалавра після ПЗСО
+        if okr != "Б":
+            continue
+        #print(f"{okr}: {name}")
         directions.append({
             "name": name,
             "url": BASE_URL + href,

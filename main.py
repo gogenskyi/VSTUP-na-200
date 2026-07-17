@@ -16,10 +16,7 @@ from database.repository import (
 from scraper.crawler.applications import insert_applications
 
 
-def fetch_with_retry(func, *args, max_retries=3, delay=5, **kwargs):
-    """
-    Виконує функцію. Якщо стається помилка, повторює спробу.
-    """
+def fetch_with_retry(func, *args, max_retries=5, delay=5, **kwargs):
     for attempt in range(max_retries):
         try:
             return func(*args, **kwargs)
@@ -27,11 +24,10 @@ def fetch_with_retry(func, *args, max_retries=3, delay=5, **kwargs):
             print(f"Помилка сервера під час {func.__name__}: {e}. Спроба {attempt + 1} з {max_retries}...")
             time.sleep(delay)
 
-    # Якщо всі спроби вичерпано, прокидаємо помилку далі
     raise Exception(f"Не вдалося виконати {func.__name__} після {max_retries} спроб.")
 
 def main():
-    conn = sqlite3.connect("vstup2.db", timeout=30)
+    conn = sqlite3.connect("vstup3.db", timeout=30)
 
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
@@ -40,8 +36,6 @@ def main():
     cur = conn.cursor()
     init_db(conn)
 
-    # Припускаємо, що get_regions відпрацює без проблем, 
-    # або її теж можна обгорнути у fetch_with_retry
     regions = get_regions()
 
     for region in regions:
@@ -49,7 +43,6 @@ def main():
         region_id = get_or_create_region(cur, region["name"])
 
         try:
-            # Використовуємо retry для отримання списку університетів
             universities = fetch_with_retry(get_universities, region["url"])
         except Exception as e:
             print(f"КРИТИЧНА ПОМИЛКА: Пропускаємо регіон {region['name']} -> {e}")
@@ -71,7 +64,6 @@ def main():
                 print(f"SKIP: {university['name']}")
                 continue
 
-            # РОЗДІЛЯЄМО TRY-EXCEPT: Тепер ловимо помилки для КОЖНОГО університету окремо
             try:
                 uni_id = insert_university(
                     cur,
@@ -80,7 +72,6 @@ def main():
                     university["url"]
                 )
 
-                # Retry для отримання напрямків
                 directions = fetch_with_retry(get_directions, university["url"])
 
                 for direction in directions:
@@ -96,7 +87,6 @@ def main():
                         direction["applications_count"]
                     )
 
-                    # Retry для отримання абітурієнтів
                     applicants = fetch_with_retry(parse_direction, direction["url"])
 
                     insert_applications(
@@ -115,14 +105,11 @@ def main():
                         f"{len(applicants)} applicants"
                     )
 
-                # Комітимо дані після УСПІШНОЇ обробки всього університету
                 conn.commit()
 
             except Exception as e:
-                # Якщо сталася помилка з конкретним університетом — відкочуємо тільки його
                 print(f"ERROR з університетом {university['name']}: {e}")
                 conn.rollback()
-                # Цикл продовжить роботу з НАСТУПНИМ університетом, а не регіоном
 
 
 if __name__ == "__main__":
