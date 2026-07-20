@@ -1,36 +1,60 @@
-import sqlite3
 import heapq
+import sqlite3
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Tuple, Set
 
 
-# Використовуємо slots для суттєвої економії пам'яті при великій кількості об'єктів
 @dataclass(slots=True)
 class Application:
     applicant_id: int
     direction_id: int
     priority: int
     score: float
+    quota: str
 
 
-def load_data(conn) -> Tuple[Dict[int, List[Application]], Dict[int, int]]:
+def load_data(conn: sqlite3.Connection) -> Tuple[Dict[int, List[Application]], Dict[int, int]]:
+    """Завантажує заяви та обсяги бюджетних місць з БД."""
     cur = conn.cursor()
 
+    # Завантаження заяв
     cur.execute("""
-        SELECT applicant_id, direction_id, priority, score
+        SELECT
+            applicant_id,
+            direction_id,
+            priority,
+            score,
+            quota
         FROM applications
+        WHERE priority IS NOT NULL AND priority > 0
         ORDER BY applicant_id, priority
     """)
 
     applications = defaultdict(list)
     for row in cur.fetchall():
-        app = Application(*row)
-        applications[row[0]].append(app)
+        app = Application(
+            applicant_id=int(row[0]),
+            direction_id=int(row[1]),
+            priority=int(row[2]),
+            score=float(row[3]),
+            quota=row[4]
+        )
+        applications[app.applicant_id].append(app)
 
-    cur.execute("SELECT id, budget_places FROM directions")
-    capacities = {row[0]: row[1] for row in cur.fetchall()}
+    # Завантаження обсягів (бюджетних місць)
+    cur.execute("""
+        SELECT
+            id,
+            budget_places
+        FROM directions
+    """)
+
+    capacities = {
+        direction_id: int(budget_places or 0)
+        for direction_id, budget_places in cur.fetchall()
+    }
 
     return applications, capacities
 
@@ -39,70 +63,80 @@ def run_competition(
         applications: Dict[int, List[Application]],
         capacities: Dict[int, int]
 ) -> Tuple[Dict[int, dict], Dict[int, List[Application]]]:
+    """Виконує алгоритм розподілу (аналог Гейла-Шеплі)."""
+
+    # Індекс наступної заяви для кожного абітурієнта
     next_choice = {applicant_id: 0 for applicant_id in applications}
-    # Зберігаємо купу (Min-Heap) для кожного напрямку.
-    # Формат елемента купи: (score, applicant_id, application_obj)
     accepted_heap = defaultdict(list)
     free_applicants: Set[int] = set(applications.keys())
 
     while free_applicants:
         applicant_id = free_applicants.pop()
-        applicant_apps = applications[applicant_id]
-        choice_idx = next_choice[applicant_id]
+        choices = applications[applicant_id]
+        idx = next_choice[applicant_id]
 
-        # Якщо всі пріоритети вичерпано
-        if choice_idx >= len(applicant_apps):
-            continue
+        if idx >= len(choices):
+            continue  # Абітурієнт вичерпав усі пріоритети
 
-        application = applicant_apps[choice_idx]
+        app = choices[idx]
         next_choice[applicant_id] += 1
 
-        direction_id = application.direction_id
+        direction_id = app.direction_id
         capacity = capacities.get(direction_id, 0)
 
-        # Якщо місць на напрямку немає взагалі
-        if capacity == 0:
+        # Якщо місць немає взагалі, пробуємо наступний пріоритет
+        if capacity <= 0:
             free_applicants.add(applicant_id)
             continue
 
-        # Елемент купи. Якщо score однакові, порівнюється applicant_id (детермінованість)
-        heap_element = (application.score, applicant_id, application)
-        direction_heap = accepted_heap[direction_id]
+        heap = accepted_heap[direction_id]
 
-        if len(direction_heap) < capacity:
-            heapq.heappush(direction_heap, heap_element)
+        # Кандидат оцінюється за балом (чим більше, тим краще)
+        # При рівних балах перевага надається вищому пріоритету (менше число)
+        candidate_score = (app.score, -app.priority, applicant_id)
+
+        # Якщо є вільні місця, просто додаємо
+        if len(heap) < capacity:
+            heapq.heappush(heap, (candidate_score, app))
+            continue
+
+        # Якщо місць немає, порівнюємо з найслабшим кандидатом
+        weakest_candidate, weakest_app = heap[0]
+
+        if candidate_score > weakest_candidate:
+            # Витісняємо найслабшого
+            removed_candidate, removed_app = heapq.heapreplace(heap, (candidate_score, app))
+            free_applicants.add(removed_app.applicant_id)
         else:
-            # direction_heap[0] — це заявка з НАЙМЕНШИМ балом (і найменшим ID при рівності)
-            lowest_accepted = direction_heap[0]
+            # Абітурієнт не пройшов, повертаємо його в чергу для наступного пріоритету
+            free_applicants.add(applicant_id)
 
-            if heap_element > lowest_accepted:
-                # Нова заявка краща за найгіршу прийняту. Виштовхуємо найгіршу.
-                rejected_element = heapq.heappushpop(direction_heap, heap_element)
-                rejected_applicant_id = rejected_element[1]
-                free_applicants.add(rejected_applicant_id)
-            else:
-                # Нова заявка гірша, абітурієнт йде на наступний пріоритет
-                free_applicants.add(applicant_id)
-
-    # Формуємо фінальні результати у зручному вигляді
+    # Формування результатів
     allocations = {}
     accepted = defaultdict(list)
 
     for direction_id, heap in accepted_heap.items():
-        # Сортуємо фінальний список для коректного збереження/відображення
-        sorted_heap = sorted(heap, key=lambda x: x[0], reverse=True)
-        for score, app_id, app in sorted_heap:
-            accepted[direction_id].append(app)
-            allocations[app_id] = {
+        # Сортуємо зарахованих за балом (від найбільшого до найменшого)
+        sorted_apps = sorted(
+            [item[1] for item in heap],
+            key=lambda x: x.score,
+            reverse=True
+        )
+        accepted[direction_id] = sorted_apps
+
+        for app in sorted_apps:
+            allocations[app.applicant_id] = {
                 "direction_id": direction_id,
                 "priority": app.priority,
-                "score": app.score
+                "score": app.score,
+                "quota": app.quota
             }
 
     return allocations, accepted
 
 
 def calculate_passing_scores(accepted: Dict[int, List[Application]]) -> Dict[int, float]:
+    """Рахує прохідний бал для кожної конкурсної пропозиції."""
     result = {}
     for direction_id, apps in accepted.items():
         if apps:
@@ -110,95 +144,185 @@ def calculate_passing_scores(accepted: Dict[int, List[Application]]) -> Dict[int
     return result
 
 
-def save_results(source_conn, allocations, accepted, passing_scores):
-    result_db = Path(__file__).resolve().parent.parent / "competition.db"
-    conn = sqlite3.connect(result_db)
-    cur = conn.cursor()
+def save_results(
+        source_conn: sqlite3.Connection,
+        allocations: Dict[int, dict],
+        accepted: Dict[int, List[Application]],
+        passing_scores: Dict[int, float]
+):
+    result_db = Path(__file__).resolve().parent / "competition_results.db"
 
-    cur.executescript("""
-        DROP TABLE IF EXISTS allocations;
-        DROP TABLE IF EXISTS directions_results;
+    with sqlite3.connect(result_db) as conn:
+        cur = conn.cursor()
 
-        CREATE TABLE allocations (
-            applicant_id INTEGER PRIMARY KEY,
-            direction_id INTEGER NOT NULL,
-            priority INTEGER NOT NULL,
-            score REAL NOT NULL
-        );
+        cur.executescript("""
+            DROP TABLE IF EXISTS results;
 
-        CREATE TABLE directions_results (
-            direction_id INTEGER PRIMARY KEY,
-            university_name TEXT NOT NULL,
-            direction_name TEXT NOT NULL,
-            budget_places INTEGER NOT NULL,
-            allocated_count INTEGER NOT NULL,
-            passing_score REAL
-        );
-    """)
+            CREATE TABLE results (
+                applicant_id INTEGER PRIMARY KEY,
+                direction_id INTEGER NOT NULL,
 
-    cur.executemany(
-        """
-        INSERT INTO allocations (applicant_id, direction_id, priority, score)
-        VALUES (?, ?, ?, ?)
-        """,
-        [(app_id, data["direction_id"], data["priority"], data["score"])
-         for app_id, data in allocations.items()]
-    )
+                university_name TEXT,
+                field_code TEXT,
+                field_name TEXT,
 
-    src_cur = source_conn.cursor()
-    src_cur.execute("""
-        SELECT d.id, d.name, d.budget_places, u.name
-        FROM directions d
-        JOIN universities u ON u.id = d.university_id
-    """)
+                speciality_code TEXT,
+                speciality_name TEXT,
 
-    rows = [
-        (
-            direction_id,
-            university_name,
-            direction_name,
-            budget_places,
-            len(accepted.get(direction_id, [])),
-            passing_scores.get(direction_id)
+                direction_name TEXT,
+
+                priority INTEGER,
+                score REAL,
+                quota TEXT,
+
+                budget_places INTEGER,
+                allocated_count INTEGER,
+                passing_score REAL
+            );
+
+            CREATE INDEX idx_results_speciality
+            ON results(speciality_code);
+
+            CREATE INDEX idx_results_field
+            ON results(field_code);
+
+            CREATE INDEX idx_results_direction
+            ON results(direction_id);
+        """)
+
+        src = source_conn.cursor()
+
+        src.execute("""
+            SELECT
+                d.id,
+                u.name,
+                d.field_code,
+                d.field_name,
+                d.speciality_code,
+                d.speciality_name,
+                d.name,
+                d.budget_places
+            FROM directions d
+            JOIN universities u
+                ON u.id = d.university_id
+        """)
+
+        direction_info = {}
+
+        for row in src.fetchall():
+            direction_info[row[0]] = {
+                "university_name": row[1],
+                "field_code": row[2],
+                "field_name": row[3],
+                "speciality_code": row[4],
+                "speciality_name": row[5],
+                "direction_name": row[6],
+                "budget_places": int(row[7] or 0)
+            }
+
+        rows = []
+
+        for applicant_id, data in allocations.items():
+
+            direction_id = data["direction_id"]
+
+            info = direction_info.get(direction_id)
+
+            if not info:
+                continue
+
+            rows.append(
+                (
+                    applicant_id,
+                    direction_id,
+
+                    info["university_name"],
+
+                    info["field_code"],
+                    info["field_name"],
+
+                    info["speciality_code"],
+                    info["speciality_name"],
+
+                    info["direction_name"],
+
+                    data["priority"],
+                    data["score"],
+                    data["quota"],
+
+                    info["budget_places"],
+
+                    len(accepted.get(direction_id, [])),
+
+                    passing_scores.get(direction_id)
+                )
+            )
+
+        cur.executemany(
+            """
+            INSERT INTO results (
+                applicant_id,
+                direction_id,
+
+                university_name,
+
+                field_code,
+                field_name,
+
+                speciality_code,
+                speciality_name,
+
+                direction_name,
+
+                priority,
+                score,
+                quota,
+
+                budget_places,
+                allocated_count,
+                passing_score
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows
         )
-        for direction_id, direction_name, budget_places, university_name in src_cur.fetchall()
-    ]
 
-    cur.executemany(
-        """
-        INSERT INTO directions_results (
-            direction_id, university_name, direction_name, 
-            budget_places, allocated_count, passing_score
-        )
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        rows
-    )
-
-    conn.commit()
-    conn.close()
+        conn.commit()
 
 
 def main():
-    db_path = Path(__file__).resolve().parent.parent / "vstup3.db"
+    db_path = Path(__file__).resolve().parent.parent / "vstup2026.db"
+
+    print(f"Шукаю базу даних за шляхом: {db_path}")
+
+    if not db_path.exists():
+        print("❌ ПОМИЛКА: Файл бази даних не знайдено!")
+        print("Будь ласка, перевірте, як точно називається файл з вашою базою.")
+        return
+
+    if db_path.stat().st_size == 0:
+        print("❌ ПОМИЛКА: Файл бази даних порожній (0 байт).")
+        print("Видаліть цей файл, він був випадково створений SQLite.")
+        return
+
     with sqlite3.connect(db_path) as conn:
+        print("✅ Базу знайдено. Завантаження даних...")
         applications, capacities = load_data(conn)
 
+        print("Запуск алгоритму розподілу...")
         allocations, accepted = run_competition(applications, capacities)
+
+        print("Розрахунок прохідних балів...")
         passing_scores = calculate_passing_scores(accepted)
 
+        print("Збереження результатів...")
         save_results(conn, allocations, accepted, passing_scores)
 
-    print(f"Applicants: {len(applications)}")
-    print(f"Directions: {len(capacities)}")
-    print(f"Budget places: {sum(capacities.values())}")
-    print(f"Allocated: {len(allocations)}")
-
-    # Виводимо топ-10 напрямків з найвищим прохідним балом
-    print("\nТоп-10 прохідних балів:")
-    top_scores = sorted(passing_scores.items(), key=lambda x: x[1], reverse=True)[:10]
-    for direction_id, score in top_scores:
-        print(f"ID {direction_id}: {score}")
+    print("\n--- Статистика симуляції ---")
+    print(f"Абітурієнтів у базі (з пріоритетами): {len(applications)}")
+    print(f"Конкурсних пропозицій (напрямків): {len(capacities)}")
+    print(f"Всього бюджетних місць: {sum(capacities.values())}")
+    print(f"Рекомендовано до зарахування: {len(allocations)}")
 
 
 if __name__ == "__main__":

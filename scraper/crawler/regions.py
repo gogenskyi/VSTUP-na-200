@@ -5,7 +5,7 @@ BASE_URL = "https://abit-poisk.org.ua"
 
 
 def get_regions():
-    html = get_html(f"{BASE_URL}/rate2025")
+    html = get_html(f"{BASE_URL}/rate2026")
 
     soup = BeautifulSoup(html, "html.parser")
 
@@ -15,7 +15,7 @@ def get_regions():
 
         href = a["href"]
 
-        if "/rate2025/region/" in href:
+        if "/rate2026/region/" in href:
 
             regions.append({
                 "name": a.get_text(strip=True),

@@ -27,7 +27,7 @@ def fetch_with_retry(func, *args, max_retries=5, delay=5, **kwargs):
     raise Exception(f"Не вдалося виконати {func.__name__} після {max_retries} спроб.")
 
 def main():
-    conn = sqlite3.connect("vstup3.db", timeout=30)
+    conn = sqlite3.connect("vstup2026.db", timeout=30)
 
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")

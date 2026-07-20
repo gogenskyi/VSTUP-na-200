@@ -18,7 +18,7 @@ def get_universities(region_url: str) -> list[dict]:
     for a in soup.find_all("a", href=True):
         href = a.get("href", "")
 
-        if "/rate2025/univer/" not in href:
+        if "/rate2026/univer/" not in href:
             continue
 
         name = a.get_text(" ", strip=True)
