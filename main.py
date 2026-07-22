@@ -1,4 +1,5 @@
 import sqlite3
+import time
 
 from scraper.utils.retry import fetch_with_retry
 from scraper.crawler.regions import get_regions
@@ -88,6 +89,8 @@ def main():
                         direction_id,
                         applicants
                     )
+
+                    time.sleep(0.5)
 
                     print(
                         f"{university['name']} | "

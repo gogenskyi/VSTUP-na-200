@@ -70,11 +70,10 @@ def build_person_key(row):
     name = extract_applicant_name(raw_name)
 
     subjects = row.get("Складові заг. балу", "")
+    scores = extract_subject_scores(subjects)
 
-    numbers = re.findall(r"\b\d{3}\b", subjects)
-
-    if numbers:
-        return f"name:{name}|{'-'.join(numbers[:4])}"
+    if scores:
+        return f"name:{name}|{'-'.join(scores)}"
 
     return f"name:{name}"
 
@@ -83,7 +82,6 @@ def get_or_create_applicant(cur, row):
     full_name = extract_applicant_name(row.get("ПІБ"))
     quota = extract_quota(row)
 
-    # Використовуємо RETURNING id для безпечного повернення ідентифікатора
     cur.execute("""
         INSERT INTO applicants (
             person_key,
@@ -104,10 +102,41 @@ def get_or_create_applicant(cur, row):
         json.dumps(row, ensure_ascii=False)
     ))
 
-    # Отримуємо ID безпосередньо з результату виконання запиту
     result = cur.fetchone()
     if result:
         return result[0]
     else:
-        # У разі непередбачуваної помилки варто кидати виключення, щоб зупинити парсер
         raise ValueError(f"Не вдалося отримати або створити ID для {person_key}")
+    
+def extract_subject_scores(text):
+    """
+    Витягує лише бали предметів НМТ/ЗНО.
+    Творчий конкурс ігнорується.
+    """
+
+    if not text:
+        return []
+
+    patterns = [
+        r"Українська мова:\s*(\d+)",
+        r"Історія України:\s*(\d+)",
+        r"Математика:\s*(\d+)",
+        r"Англійська мова:\s*(\d+)",
+        r"Німецька мова:\s*(\d+)",
+        r"Французька мова:\s*(\d+)",
+        r"Іспанська мова:\s*(\d+)",
+        r"Біологія:\s*(\d+)",
+        r"Географія:\s*(\d+)",
+        r"Фізика:\s*(\d+)",
+        r"Хімія:\s*(\d+)",
+        r"Українська література:\s*(\d+)"
+    ]
+
+    scores = []
+
+    for pattern in patterns:
+        m = re.search(pattern, text)
+        if m:
+            scores.append(m.group(1))
+
+    return scores
